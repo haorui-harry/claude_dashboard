@@ -4,8 +4,8 @@
 
 cd "$(dirname "$0")"
 
-source /minconda3/etc/profile.d/conda.sh
-conda activate haorui1
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate claude_dashboard
 
 # Kill old processes
 pkill -f "python api.py" 2>/dev/null

@@ -69,7 +69,7 @@ claude_dashboard/
 
 ```bash
 # 仅启动 API
-conda run -n haorui1 python api.py
+conda run -n claude_dashboard python api.py
 
 # 仅启动前端（需 API 已在运行）
 cd frontend && npm run dev
@@ -80,7 +80,7 @@ cd frontend && npm run dev
 如果不想用 npm，可以直接运行 Dash 版本：
 
 ```bash
-conda run -n haorui1 python app.py
+conda run -n claude_dashboard python app.py
 ```
 
 同样监听 port 8999，功能一致但交互响应略慢。
