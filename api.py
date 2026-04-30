@@ -124,6 +124,7 @@ def load_all():
             "first_msg": first_user, "total": len(events),
             "search_text": search_text[:3000],
             "model": model,
+            "path": str(jsonl),
         })
     meta.sort(key=lambda s: s["end"], reverse=True)  # sort by last activity
     return meta
@@ -138,6 +139,19 @@ def get_events(sid):
     if sid not in _events_cache:
         load_all()
     return jsonify(_events_cache.get(sid, []))
+
+@app.route("/api/sessions/<sid>", methods=["DELETE"])
+def delete_session(sid):
+    """Delete a session trajectory file (.jsonl). Only removes the JSONL file itself."""
+    try:
+        for jsonl in PROJECTS_DIR.rglob("*.jsonl"):
+            if jsonl.stem == sid:
+                jsonl.unlink()
+                _events_cache.pop(sid, None)
+                return jsonify({"success": True})
+        return jsonify({"success": False, "error": "Session not found"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
     print("🚀 API → http://localhost:8998")

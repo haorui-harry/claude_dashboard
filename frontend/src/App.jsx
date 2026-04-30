@@ -85,6 +85,7 @@ function EventRow({ event, idx, isExpanded, onToggle }) {
   const isResult = kind === 'RESULT'
   const isCode = kind === 'BASH' || kind === 'RESULT'
   const isThink = kind === 'THINK'
+  const isTool = kind === 'BASH' || kind === 'READ' || kind === 'WRITE' || kind === 'EDIT' || kind === 'WEBFETCH' || kind === 'WEBSEARCH' || kind === 'AGENT' || kind === 'TASKCREATE' || kind === 'TASKUPDATE'
   const isLong = content.length > COLLAPSE_LEN
   const shown = isLong && !isExpanded ? content.substring(0, COLLAPSE_LEN) : content
 
@@ -120,6 +121,11 @@ function EventRow({ event, idx, isExpanded, onToggle }) {
           <span style={{ background: st.bg, color: st.color, padding: '2px 10px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, letterSpacing: '.02em' }}>
             {st.label}
           </span>
+          {isTool && (
+            <span style={{ marginLeft: '6px', fontSize: '11px', color: '#f59e0b', fontWeight: 700, background: '#fffbeb', padding: '1px 6px', borderRadius: '4px', border: '1px solid #fde68a' }}>
+              🔧 tool
+            </span>
+          )}
           <span style={{ color: '#94a3b8', fontSize: '11px', marginLeft: '8px' }}>{tsStr}</span>
         </div>
         <pre style={preStyle}>{shown}</pre>
@@ -154,7 +160,7 @@ const FILTER_ORDER = ['All', 'USER', 'THINK', 'BASH', 'READ', 'WRITE', 'EDIT', '
 
 export default function App() {
   const [sessions, setSessions] = useState([])
-  const [selectedIdx, setSelectedIdx] = useState(0)
+  const [selectedId, setSelectedId] = useState(null)
   const [curEvents, setCurEvents] = useState([])
   const [filter, setFilter] = useState('All')
   const [expanded, setExpanded] = useState(new Set())
@@ -192,13 +198,22 @@ export default function App() {
     return () => clearInterval(iv)
   }, [])
 
-  // Load events when sessions first arrive or selection changes
+  // Resolve selected session from stable ID so refreshes don't jump to newest
+  const selectedIdx = sessions.findIndex(s => s.id === selectedId)
+  const effectiveIdx = selectedIdx >= 0 ? selectedIdx : 0
+  const curSession = sessions[effectiveIdx] || null
+
   useEffect(() => {
     if (sessions.length > 0) {
-      const sid = sessions[selectedIdx]?.id
-      if (sid) loadEvents(sid)
+      const sid = curSession?.id || sessions[0]?.id
+      if (sid) {
+        if (selectedId === null && sid === sessions[0]?.id) {
+          setSelectedId(sid)
+        }
+        loadEvents(sid)
+      }
     }
-  }, [selectedIdx, sessions])
+  }, [sessions, selectedId])
 
   const toggleExpand = (i) => {
     setExpanded(prev => {
@@ -206,6 +221,27 @@ export default function App() {
       next.has(i) ? next.delete(i) : next.add(i)
       return next
     })
+  }
+
+  const handleDelete = async (sid, e) => {
+    e.stopPropagation()
+    if (!window.confirm('确定要删除这个 session 吗？此操作不可恢复。')) return
+    try {
+      const res = await fetch(`/api/sessions/${sid}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        if (selectedId === sid) {
+          setSelectedId(null)
+          setCurEvents([])
+          loadedSidRef.current = null
+        }
+        loadSessions()
+      } else {
+        alert('删除失败: ' + (data.error || '未知错误'))
+      }
+    } catch (err) {
+      alert('删除失败: ' + err.message)
+    }
   }
 
   const filteredSessions = searchQuery
@@ -216,7 +252,6 @@ export default function App() {
     : sessions
 
   const filteredEvents = filter === 'All' ? curEvents : curEvents.filter(e => e.kind === filter)
-  const curSession = sessions[selectedIdx]
 
   const filterCounts = {}
   FILTER_ORDER.forEach(k => {
@@ -241,7 +276,10 @@ export default function App() {
         {/* ── left: session list ── */}
         <div style={{ width: '240px', minWidth: '240px', background: '#f8fafc', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '.08em', marginBottom: '6px' }}>SESSIONS</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '.08em' }}>SESSIONS</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>{filteredSessions.length} / {sessions.length}</span>
+            </div>
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -255,25 +293,35 @@ export default function App() {
             {filteredSessions.length === 0
               ? <div style={{ color: '#94a3b8', padding: '20px', fontSize: '13px' }}>无匹配结果</div>
               : filteredSessions.map(s => {
-                  const origIdx = sessions.indexOf(s)
-                  const active = origIdx === selectedIdx
+                  const active = s.id === selectedId
                   const startStr = s.start ? s.start.substring(5, 16).replace('T', ' ') : ''
                   return (
                     <div
                       key={s.id}
-                      onClick={() => setSelectedIdx(origIdx)}
+                      onClick={() => setSelectedId(s.id)}
                       style={{ borderLeft: `3px solid ${active ? '#3b82f6' : 'transparent'}`, background: active ? '#eff6ff' : 'transparent', padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #e2e8f0', transition: 'background .1s' }}
                       onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#eff6ff' }}
                       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
                     >
-                      <div style={{ display: 'flex', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         <span style={{ fontSize: '11px', color: '#64748b' }}>{startStr}</span>
-                        <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 700, marginLeft: 'auto' }}>{fmtDur(s.dur_ms)}</span>
+                        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.id}</span>
+                        <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 700, flexShrink: 0 }}>{fmtDur(s.dur_ms)}</span>
                       </div>
                       <div style={{ fontSize: '12px', color: active ? '#1e293b' : '#475569', lineHeight: '1.4', marginBottom: '4px', wordBreak: 'break-word' }}>
                         {s.first_msg ? (s.first_msg.length > 55 ? s.first_msg.substring(0, 55) + '…' : s.first_msg) : '(no message)'}
                       </div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>{s.total} events</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>{s.total} events</div>
+                        <button
+                          onClick={(e) => handleDelete(s.id, e)}
+                          style={{ marginLeft: 'auto', fontSize: '10px', color: '#ef4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          删除
+                        </button>
+                      </div>
                     </div>
                   )
                 })
@@ -283,6 +331,19 @@ export default function App() {
 
         {/* ── center: timeline ── */}
         <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* session id header */}
+          {curSession && (
+            <div style={{ padding: '8px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em', flexShrink: 0 }}>SESSION</span>
+              <span
+                title="双击复制"
+                onDoubleClick={() => { navigator.clipboard.writeText(curSession.id); alert('Session ID 已复制到剪贴板') }}
+                style={{ fontSize: '12px', color: '#0369a1', fontFamily: "'Consolas','Monaco','Courier New',monospace", cursor: 'pointer' }}
+              >
+                {curSession.id}
+              </span>
+            </div>
+          )}
           {/* filter bar */}
           <div style={{ padding: '10px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '6px', flexWrap: 'wrap', background: '#fff' }}>
             {FILTER_ORDER.filter(k => k === 'All' || filterCounts[k] > 0).map(k => {
@@ -295,6 +356,26 @@ export default function App() {
               )
             })}
           </div>
+          {/* tool summary bar */}
+          {(() => {
+            const toolKinds = ['BASH','READ','WRITE','EDIT','WEBFETCH','WEBSEARCH','AGENT','TASKCREATE','TASKUPDATE']
+            const totalTools = toolKinds.reduce((sum, k) => sum + (curSession?.tool_counts?.[k] || 0), 0)
+            if (totalTools === 0) return null
+            return (
+              <div style={{ padding: '6px 16px', borderBottom: '1px solid #e2e8f0', background: '#fafafa', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', letterSpacing: '.05em' }}>TOOLS</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', background: '#e2e8f0', padding: '2px 8px', borderRadius: '4px' }}>{totalTools} calls</span>
+                {toolKinds.filter(k => curSession?.tool_counts?.[k] > 0).map(k => {
+                  const st = getStyle(k)
+                  return (
+                    <span key={k} style={{ fontSize: '11px', color: st.color, background: st.bg, padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                      {st.label} {curSession.tool_counts[k]}
+                    </span>
+                  )
+                })}
+              </div>
+            )
+          })()}
           {/* events */}
           <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, background: '#fff' }}>
             {loading ? (
@@ -328,9 +409,9 @@ export default function App() {
             <SecTitle>TOOL USAGE</SecTitle>
             <DonutChart tc={curSession.tool_counts || {}} />
 
-            <SecTitle>TOP FILES</SecTitle>
+            <SecTitle>MODIFIED FILES</SecTitle>
             {(() => {
-              const files = Object.entries(curSession.file_counts || {}).sort((a, b) => b[1] - a[1]).slice(0, 8)
+              const files = Object.entries(curSession.file_counts || {}).sort((a, b) => b[1] - a[1])
               if (files.length === 0) return <div style={{ color: '#94a3b8', fontSize: '11px' }}>No file accesses</div>
               const maxC = files[0][1]
               return files.map(([name, cnt]) => (
