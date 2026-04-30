@@ -194,7 +194,7 @@ app.layout = html.Div([
                 html.Div("SESSIONS",
                          style={"fontSize":"11px","fontWeight":"700","color":"#94a3b8",
                                 "letterSpacing":".08em","marginBottom":"6px"}),
-                dcc.Input(id="search-input", type="text", placeholder="搜索 session...",
+                dcc.Input(id="search-input", type="text", placeholder="搜索 session 内容或 ID...",
                           debounce=True,
                           style={"width":"100%","padding":"6px 10px","fontSize":"12px",
                                  "border":"1px solid #e2e8f0","borderRadius":"6px",
@@ -246,7 +246,7 @@ def render_list(sessions, query, sel):
     q = (query or "").strip().lower()
     rows = []
     for i, s in enumerate(sessions):
-        if q and q not in s["first_msg"].lower() and q not in s.get("search_text",""):
+        if q and q not in s["id"].lower() and q not in s["first_msg"].lower() and q not in s.get("search_text",""):
             continue
         active = i == sel
         start_str = s["start"][5:16].replace("T"," ")

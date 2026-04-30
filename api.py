@@ -116,7 +116,7 @@ def load_all():
                 fp = e["content"].split()[0] if e["content"] else ""
                 if fp and "/" in fp: file_counts[Path(fp).name] += 1
         first_user = next((e["content"] for e in events if e["kind"]=="USER"), "")
-        search_text = " ".join(e["content"] for e in events if e["kind"] in ("USER","SAY")).lower()
+        search_text = (sid + " ").lower() + " ".join(e["content"] for e in events if e["kind"] in ("USER","SAY")).lower()
         model = _extract_model(lines)
         meta.append({
             "id": sid, "start": start_str, "end": end_str, "dur_ms": dur_ms,

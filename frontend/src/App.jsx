@@ -247,7 +247,7 @@ export default function App() {
   const filteredSessions = searchQuery
     ? sessions.filter(s => {
         const q = searchQuery.toLowerCase()
-        return s.first_msg.toLowerCase().includes(q) || (s.search_text || '').includes(q)
+        return s.id.toLowerCase().includes(q) || s.first_msg.toLowerCase().includes(q) || (s.search_text || '').includes(q)
       })
     : sessions
 
@@ -283,7 +283,7 @@ export default function App() {
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="搜索 session..."
+              placeholder="搜索 session 内容或 ID..."
               style={{ width: '100%', padding: '6px 10px', fontSize: '12px', border: '1px solid #e2e8f0', borderRadius: '6px', background: '#fff', color: '#1e293b', outline: 'none', boxSizing: 'border-box' }}
               onFocus={e => e.target.style.borderColor = '#3b82f6'}
               onBlur={e => e.target.style.borderColor = '#e2e8f0'}
