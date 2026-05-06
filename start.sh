@@ -5,7 +5,7 @@
 cd "$(dirname "$0")"
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate claude_dashboard
+conda activate "${CONDA_ENV:-claude_dashboard}"
 
 # Kill old processes
 pkill -f "python api.py" 2>/dev/null

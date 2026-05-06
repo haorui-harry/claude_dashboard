@@ -12,6 +12,8 @@ const KIND_STYLE = {
   WEBSEARCH: { bg: '#cffafe', color: '#0e7490', label: 'WebSearch' },
   RESULT:    { bg: '#fff7ed', color: '#c2410c', label: 'Result' },
   AGENT:     { bg: '#ccfbf1', color: '#0f766e', label: 'Agent' },
+  TASKCREATE:{ bg: '#fef9c3', color: '#a16207', label: 'TaskCreate' },
+  TASKUPDATE:{ bg: '#e0e7ff', color: '#4338ca', label: 'TaskUpdate' },
 }
 
 function getStyle(kind) {
@@ -75,6 +77,164 @@ function DonutChart({ tc }) {
   )
 }
 
+// ── turn analysis divider ────────────────────────────────────────
+function TurnDivider({ turn, analysis, isExpanded, onToggle }) {
+  if (!analysis) return null
+  const { core_action, focus, intention, time_cost_ms, tool_summary, errors } = analysis
+  return (
+    <div style={{ padding: '8px 16px', background: '#f0f9ff', borderBottom: '1px solid #e0f2fe', borderLeft: '3px solid #0ea5e9' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={onToggle}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '4px', flexShrink: 0 }}>
+          Turn {turn}
+        </span>
+        <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {core_action || '...'}
+        </span>
+        {time_cost_ms > 0 && (
+          <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0 }}>{(time_cost_ms / 1000).toFixed(1)}s</span>
+        )}
+        {errors && errors.length > 0 && (
+          <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 700, background: '#fef2f2', padding: '1px 6px', borderRadius: '4px', flexShrink: 0 }}>
+            {errors.length} err{errors.length > 1 ? 's' : ''}
+          </span>
+        )}
+        <span style={{ fontSize: '11px', color: '#64748b', flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</span>
+      </div>
+      {isExpanded && (
+        <div style={{ marginTop: '8px', fontSize: '12px', color: '#334155', lineHeight: '1.6' }}>
+          {focus && <div><strong style={{ color: '#0f172a' }}>重点：</strong>{focus}</div>}
+          {intention && <div><strong style={{ color: '#0f172a' }}>意图：</strong>{intention}</div>}
+          {tool_summary && tool_summary.length > 0 && (
+            <div style={{ marginTop: '4px' }}>
+              <strong style={{ color: '#0f172a' }}>工具：</strong>
+              {tool_summary.map((t, i) => (
+                <span key={i} style={{ display: 'inline-block', background: '#e0f2fe', color: '#0369a1', padding: '1px 6px', borderRadius: '4px', marginRight: '4px', marginBottom: '2px', fontSize: '11px' }}>
+                  {t.name}{t.target ? `: ${t.target}` : t.note ? `: ${t.note}` : ''}
+                </span>
+              ))}
+            </div>
+          )}
+          {errors && errors.length > 0 && (
+            <div style={{ marginTop: '6px' }}>
+              {errors.map((err, i) => (
+                <div key={i} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', padding: '6px 8px', marginBottom: '4px', fontSize: '11px', color: '#7f1d1d' }}>
+                  <strong>Error ({err.tool || '?'}):</strong> {(err.error_text || '').substring(0, 200)}
+                  {err.root_cause && <div style={{ color: '#991b1b', marginTop: '2px' }}>原因：{err.root_cause}</div>}
+                  {err.suggestion && <div style={{ color: '#7f1d1d', marginTop: '2px' }}>建议：{err.suggestion}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── summary panel ────────────────────────────────────────────────
+function SummaryPanel({ summary, agentInsight, isExpanded, onToggle, elapsedSec }) {
+  if (!summary) return null
+  const { phases, test_frequency, development_process, parallel_degree, redundancy, tool_stats, deliverable_assessment, issues } = summary
+  return (
+    <div style={{ padding: '12px 16px', background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={onToggle}>
+        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>Agent 全局总结</span>
+        {elapsedSec > 0 && <span style={{ fontSize: '11px', color: '#94a3b8' }}>(分析耗时 {elapsedSec}s)</span>}
+        <span style={{ fontSize: '11px', color: '#64748b', marginLeft: 'auto' }}>{isExpanded ? '▲ 收起' : '▼ 展开'}</span>
+      </div>
+      {isExpanded && (
+        <div style={{ marginTop: '10px', fontSize: '12px', color: '#334155', lineHeight: '1.7' }}>
+          {phases && phases.length > 0 && (
+            <div><strong style={{ color: '#0f172a' }}>阶段划分：</strong>{phases.join(' → ')}</div>
+          )}
+          <div><strong style={{ color: '#0f172a' }}>自测频率：</strong>
+            <span style={{ color: test_frequency === '高' ? '#16a34a' : test_frequency === '低' ? '#ef4444' : '#ca8a04', fontWeight: 700 }}>{test_frequency}</span>
+            {parallel_degree && <span style={{ marginLeft: '12px' }}><strong style={{ color: '#0f172a' }}>并行利用：</strong><span style={{ fontWeight: 700 }}>{parallel_degree}</span></span>}
+            {redundancy && <span style={{ marginLeft: '12px' }}><strong style={{ color: '#0f172a' }}>冗余度：</strong><span style={{ fontWeight: 700 }}>{redundancy}</span></span>}
+          </div>
+          {development_process && <div><strong style={{ color: '#0f172a' }}>开发过程：</strong>{development_process}</div>}
+          {tool_stats && Object.keys(tool_stats).length > 0 && (
+            <div style={{ marginTop: '4px' }}>
+              <strong style={{ color: '#0f172a' }}>Tool 统计：</strong>
+              {Object.entries(tool_stats).map(([k, v]) => (
+                <span key={k} style={{ display: 'inline-block', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', marginRight: '4px', marginBottom: '2px', fontSize: '11px' }}>
+                  {k}: {v}
+                </span>
+              ))}
+            </div>
+          )}
+          {deliverable_assessment && (
+            <div style={{
+              marginTop: '6px', padding: '8px', borderRadius: '6px',
+              background: deliverable_assessment.meets_requirements ? '#f0fdf4' : '#fef2f2',
+              border: `1px solid ${deliverable_assessment.meets_requirements ? '#bbf7d0' : '#fecaca'}`
+            }}>
+              <div>
+                <strong>产物评价：</strong>
+                {deliverable_assessment.completeness || ''} {deliverable_assessment.meets_requirements ? '✅ 符合需求' : '❌ 未完全满足'}
+              </div>
+              {deliverable_assessment.notes && <div style={{ marginTop: '2px', color: '#475569' }}>{deliverable_assessment.notes}</div>}
+            </div>
+          )}
+          {issues && issues.length > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              <strong style={{ color: '#0f172a' }}>问题与改进：</strong>
+              {issues.map((issue, i) => (
+                <div key={i} style={{ marginTop: '4px', padding: '6px 8px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '4px', fontSize: '11px' }}>
+                  <span style={{ color: issue.severity === '高' ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>[{issue.severity}]</span> {issue.description}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Agent Insight */}
+          {agentInsight && (
+            <div style={{ marginTop: '12px', padding: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e40af', marginBottom: '6px' }}>🧠 Agent 行为洞察</div>
+              {agentInsight.unique_patterns && agentInsight.unique_patterns.length > 0 && (
+                <div style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#1e3a8a' }}>独特处理方式：</strong>
+                  {agentInsight.unique_patterns.map((item, i) => (
+                    <div key={i} style={{ marginLeft: '8px', marginTop: '2px', fontSize: '11px', color: '#334155' }}>• {item}</div>
+                  ))}
+                </div>
+              )}
+              {agentInsight.hidden_habits && agentInsight.hidden_habits.length > 0 && (
+                <div style={{ marginBottom: '6px' }}>
+                  <strong style={{ color: '#1e3a8a' }}>隐性策略：</strong>
+                  {agentInsight.hidden_habits.map((item, i) => (
+                    <div key={i} style={{ marginLeft: '8px', marginTop: '2px', fontSize: '11px', color: '#334155' }}>• {item}</div>
+                  ))}
+                </div>
+              )}
+              {agentInsight.success_conditions && (
+                <div style={{ marginBottom: '4px' }}>
+                  <strong style={{ color: '#1e3a8a' }}>成功/失败条件：</strong>
+                  <span style={{ fontSize: '11px', color: '#334155' }}>{agentInsight.success_conditions}</span>
+                </div>
+              )}
+              {agentInsight.recovery_strategy && (
+                <div style={{ marginBottom: '4px' }}>
+                  <strong style={{ color: '#1e3a8a' }}>恢复策略：</strong>
+                  <span style={{ fontSize: '11px', color: '#334155' }}>{agentInsight.recovery_strategy}</span>
+                </div>
+              )}
+              {agentInsight.actionable_takeaways && agentInsight.actionable_takeaways.length > 0 && (
+                <div>
+                  <strong style={{ color: '#1e3a8a' }}>可迁移经验：</strong>
+                  {agentInsight.actionable_takeaways.map((item, i) => (
+                    <div key={i} style={{ marginLeft: '8px', marginTop: '2px', fontSize: '11px', color: '#334155' }}>• {item}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── single event row ─────────────────────────────────────────────
 const COLLAPSE_LEN = 300
 
@@ -110,12 +270,10 @@ function EventRow({ event, idx, isExpanded, onToggle }) {
       padding: '10px 16px', borderBottom: '1px solid #f8fafc',
       marginLeft: isResult ? '24px' : '0',
     }}>
-      {/* dot + vertical line */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '10px', marginRight: '12px' }}>
         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: st.color, border: `2px solid ${st.color}44`, marginTop: '2px', flexShrink: 0 }} />
         <div style={{ width: '2px', background: '#f1f5f9', flex: 1, marginTop: '2px' }} />
       </div>
-      {/* content */}
       <div style={{ flex: 1, minWidth: 0, paddingBottom: '14px' }}>
         <div style={{ marginBottom: '5px', display: 'flex', alignItems: 'center' }}>
           <span style={{ background: st.bg, color: st.color, padding: '2px 10px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, letterSpacing: '.02em' }}>
@@ -130,14 +288,11 @@ function EventRow({ event, idx, isExpanded, onToggle }) {
         </div>
         <pre style={preStyle}>{shown}</pre>
         {isLong && (
-          <button
-            onClick={() => onToggle(idx)}
-            style={{
-              background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px',
-              padding: '3px 10px', fontSize: '11px', color: '#64748b', cursor: 'pointer',
-              marginTop: '4px', display: 'block', width: '100%', textAlign: 'left',
-            }}
-          >
+          <button onClick={() => onToggle(idx)} style={{
+            background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px',
+            padding: '3px 10px', fontSize: '11px', color: '#64748b', cursor: 'pointer',
+            marginTop: '4px', display: 'block', width: '100%', textAlign: 'left',
+          }}>
             {isExpanded ? '▲ Show less' : `▼ Show more (${content.length} chars)`}
           </button>
         )}
@@ -168,9 +323,25 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const loadedSidRef = useRef(null)
 
-  const loadSessions = async () => {
+  // analysis states
+  const [analysis, setAnalysis] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [expandedAnalysis, setExpandedAnalysis] = useState(new Set())
+  const [summaryExpanded, setSummaryExpanded] = useState(false)
+  const [showCacheChoice, setShowCacheChoice] = useState(false)
+  const [cacheAvailable, setCacheAvailable] = useState(false)
+
+  const _applyAnalysis = (data) => {
+    setAnalysis(data)
+    setExpandedAnalysis(new Set())
+    setSummaryExpanded(true)
+    setShowCacheChoice(false)
+  }
+
+  const loadSessions = async (refresh = false) => {
     try {
-      const res = await fetch('/api/sessions')
+      const qs = refresh ? '?refresh=1' : ''
+      const res = await fetch(`/api/sessions${qs}`)
       const data = await res.json()
       setSessions(data)
     } catch (e) { console.error('Failed to load sessions', e) }
@@ -183,6 +354,9 @@ export default function App() {
     setCurEvents([])
     setExpanded(new Set())
     setFilter('All')
+    setAnalysis(null)
+    setExpandedAnalysis(new Set())
+    setSummaryExpanded(false)
     try {
       const res = await fetch(`/api/sessions/${sid}/events`)
       const data = await res.json()
@@ -191,14 +365,78 @@ export default function App() {
     finally { setLoading(false) }
   }
 
-  // Initial load + periodic refresh
+  const runAnalyze = async () => {
+    if (!curSession) return
+    setAnalyzing(true)
+    try {
+      // Check cache first
+      const checkRes = await fetch(`/api/sessions/${curSession.id}/analyze`)
+      const checkData = await checkRes.json()
+      if (checkData.cached) {
+        setCacheAvailable(true)
+        setShowCacheChoice(true)
+        setAnalyzing(false)
+        return
+      }
+      // No cache — go ahead
+      const res = await fetch(`/api/sessions/${curSession.id}/analyze`, { method: 'POST' })
+      const data = await res.json()
+      if (data.error) {
+        alert('分析失败: ' + data.error)
+      } else {
+        _applyAnalysis(data)
+      }
+    } catch (e) {
+      alert('分析请求失败: ' + e.message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const runAnalyzeCached = async () => {
+    if (!curSession) return
+    setAnalyzing(true)
+    setShowCacheChoice(false)
+    try {
+      const res = await fetch(`/api/sessions/${curSession.id}/analyze`, { method: 'POST' })
+      const data = await res.json()
+      if (data.error) {
+        alert('加载缓存失败: ' + data.error)
+      } else {
+        _applyAnalysis(data)
+      }
+    } catch (e) {
+      alert('加载缓存失败: ' + e.message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const runAnalyzeForce = async () => {
+    if (!curSession) return
+    setAnalyzing(true)
+    setShowCacheChoice(false)
+    try {
+      const res = await fetch(`/api/sessions/${curSession.id}/analyze?force=true`, { method: 'POST' })
+      const data = await res.json()
+      if (data.error) {
+        alert('分析失败: ' + data.error)
+      } else {
+        _applyAnalysis(data)
+      }
+    } catch (e) {
+      alert('分析请求失败: ' + e.message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   useEffect(() => {
-    loadSessions()
-    const iv = setInterval(loadSessions, 15000)
+    loadSessions(true)
+    const iv = setInterval(() => loadSessions(false), 15000)
     return () => clearInterval(iv)
   }, [])
 
-  // Resolve selected session from stable ID so refreshes don't jump to newest
   const selectedIdx = sessions.findIndex(s => s.id === selectedId)
   const effectiveIdx = selectedIdx >= 0 ? selectedIdx : 0
   const curSession = sessions[effectiveIdx] || null
@@ -219,6 +457,14 @@ export default function App() {
     setExpanded(prev => {
       const next = new Set(prev)
       next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
+
+  const toggleAnalysis = (turnIdx) => {
+    setExpandedAnalysis(prev => {
+      const next = new Set(prev)
+      next.has(turnIdx) ? next.delete(turnIdx) : next.add(turnIdx)
       return next
     })
   }
@@ -331,9 +577,9 @@ export default function App() {
 
         {/* ── center: timeline ── */}
         <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* session id header */}
+          {/* session id header + analyze button */}
           {curSession && (
-            <div style={{ padding: '8px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc' }}>
+            <div style={{ padding: '8px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', position: 'relative' }}>
               <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em', flexShrink: 0 }}>SESSION</span>
               <span
                 title="双击复制"
@@ -342,6 +588,80 @@ export default function App() {
               >
                 {curSession.id}
               </span>
+              <button
+                onClick={runAnalyze}
+                disabled={analyzing}
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: '11px', fontWeight: 700,
+                  color: analyzing ? '#94a3b8' : '#fff',
+                  background: analyzing ? '#e2e8f0' : '#0ea5e9',
+                  border: 'none', borderRadius: '5px', padding: '4px 12px',
+                  cursor: analyzing ? 'not-allowed' : 'pointer',
+                  transition: 'all .1s',
+                  position: 'relative',
+                }}
+                onMouseEnter={e => { if (!analyzing) e.currentTarget.style.background = '#0284c7' }}
+                onMouseLeave={e => { if (!analyzing) e.currentTarget.style.background = '#0ea5e9' }}
+              >
+                {analyzing ? '分析中…' : '🔍 Agent 分析'}
+              </button>
+              {/* cache choice popover */}
+              {showCacheChoice && (
+                <div style={{
+                  position: 'absolute',
+                  top: '40px',
+                  right: '16px',
+                  zIndex: 200,
+                  background: '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+                  padding: '12px',
+                  width: '200px',
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>已有分析缓存</div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px', lineHeight: '1.4' }}>
+                    该 session 之前已生成过分析，可以选择使用缓存或重新分析。
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button
+                      onClick={runAnalyzeCached}
+                      style={{
+                        fontSize: '11px', fontWeight: 700, color: '#fff',
+                        background: '#0ea5e9', border: 'none', borderRadius: '4px',
+                        padding: '5px 0', cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#0284c7'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#0ea5e9'}
+                    >
+                      📋 使用缓存
+                    </button>
+                    <button
+                      onClick={runAnalyzeForce}
+                      style={{
+                        fontSize: '11px', fontWeight: 700, color: '#475569',
+                        background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px',
+                        padding: '5px 0', cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                    >
+                      🔄 重新生成
+                    </button>
+                    <button
+                      onClick={() => setShowCacheChoice(false)}
+                      style={{
+                        fontSize: '11px', color: '#64748b',
+                        background: 'transparent', border: 'none',
+                        padding: '4px 0', cursor: 'pointer',
+                      }}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {/* filter bar */}
@@ -384,9 +704,47 @@ export default function App() {
               <div style={{ color: '#94a3b8', padding: '40px', textAlign: 'center', fontSize: '14px' }}>
                 {curEvents.length === 0 ? 'Select a session' : `No ${filter} events`}
               </div>
-            ) : filteredEvents.map((e, i) => (
-              <EventRow key={i} event={e} idx={i} isExpanded={expanded.has(i)} onToggle={toggleExpand} />
-            ))}
+            ) : (() => {
+              let lastTurnIdx = null
+              return filteredEvents.map((e, i) => {
+                const out = []
+                if (e.turn_index !== undefined && e.turn_index !== lastTurnIdx) {
+                  lastTurnIdx = e.turn_index
+                  const turnAnalysis = analysis?.turns?.[e.turn_index]
+                  if (turnAnalysis) {
+                    out.push(
+                      <TurnDivider
+                        key={`ta-${e.turn_index}`}
+                        turn={e.turn_index}
+                        analysis={turnAnalysis}
+                        isExpanded={expandedAnalysis.has(e.turn_index)}
+                        onToggle={() => toggleAnalysis(e.turn_index)}
+                      />
+                    )
+                  }
+                }
+                out.push(
+                  <EventRow
+                    key={`ev-${i}`}
+                    event={e}
+                    idx={i}
+                    isExpanded={expanded.has(i)}
+                    onToggle={toggleExpand}
+                  />
+                )
+                return out
+              })
+            })()}
+            {/* summary panel at bottom */}
+            {analysis && analysis.summary && (
+              <SummaryPanel
+                summary={analysis.summary}
+                agentInsight={analysis.agent_insight}
+                isExpanded={summaryExpanded}
+                onToggle={() => setSummaryExpanded(v => !v)}
+                elapsedSec={analysis._analysis_elapsed_sec || 0}
+              />
+            )}
           </div>
         </div>
 
